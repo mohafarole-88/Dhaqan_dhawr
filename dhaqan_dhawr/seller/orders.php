@@ -19,11 +19,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     
     try {
         if ($action === 'update_status') {
-            $new_status = $_POST['status'];
-            $stmt = $conn->prepare("UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?");
-            $stmt->bind_param("si", $new_status, $order_id);
-            $stmt->execute();
-            $success_message = "Order status updated successfully.";
+            // Check if order is cancelled - prevent updates to cancelled orders
+            $check_stmt = $conn->prepare("SELECT status FROM orders WHERE id = ?");
+            $check_stmt->bind_param("i", $order_id);
+            $check_stmt->execute();
+            $current_order = $check_stmt->get_result()->fetch_assoc();
+            
+            if ($current_order && $current_order['status'] === 'cancelled') {
+                $error_message = "Cannot update cancelled orders. This order was cancelled by the buyer.";
+            } else {
+                $new_status = $_POST['status'];
+                $stmt = $conn->prepare("UPDATE orders SET status = ?, updated_at = NOW() WHERE id = ?");
+                $stmt->bind_param("si", $new_status, $order_id);
+                $stmt->execute();
+                $success_message = "Order status updated successfully.";
+            }
         }
     } catch (Exception $e) {
         $error_message = "Error updating order: " . $e->getMessage();
@@ -135,7 +145,7 @@ include '../includes/header.php';
                         <i class="fas fa-dollar-sign"></i>
                     </div>
                     <div class="stat-content">
-                        <h3>$<?= number_format(array_sum(array_column($orders, 'total_amount')), 2); ?></h3>
+                        <h3>$<?= number_format(array_sum(array_column(array_filter($orders, function($o) { return $o['status'] !== 'cancelled'; }), 'total_amount')), 2); ?></h3>
                         <p>Total Revenue</p>
                     </div>
                 </div>
@@ -208,18 +218,22 @@ include '../includes/header.php';
                                             <button class="btn btn-sm btn-primary" onclick="viewOrderDetails(<?= $order['id']; ?>)">
                                                 View Details
                                             </button>
-                                            <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to update this order status?')">
-                                                <input type="hidden" name="order_id" value="<?= $order['id']; ?>">
-                                                <input type="hidden" name="action" value="update_status">
-                                                <select name="status" class="form-control form-control-sm" onchange="this.form.submit()">
-                                                    <option value="pending" <?= $order['status'] === 'pending' ? 'selected' : ''; ?>>Pending</option>
-                                                    <option value="processing" <?= $order['status'] === 'processing' ? 'selected' : ''; ?>>Processing</option>
-                                                    <option value="shipped" <?= $order['status'] === 'shipped' ? 'selected' : ''; ?>>Shipped</option>
-                                                    <option value="delivered" <?= $order['status'] === 'delivered' ? 'selected' : ''; ?>>Delivered</option>
-                                                    <option value="completed" <?= $order['status'] === 'completed' ? 'selected' : ''; ?>>Completed</option>
-                                                    <option value="cancelled" <?= $order['status'] === 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
-                                                </select>
-                                            </form>
+                                            <?php if ($order['status'] === 'cancelled'): ?>
+                                                <span class="badge badge-cancelled">Cancelled by Buyer</span>
+                                                <small class="text-muted d-block">Cannot be modified</small>
+                                            <?php else: ?>
+                                                <form method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to update this order status?')">
+                                                    <input type="hidden" name="order_id" value="<?= $order['id']; ?>">
+                                                    <input type="hidden" name="action" value="update_status">
+                                                    <select name="status" class="form-control form-control-sm" onchange="this.form.submit()">
+                                                        <option value="pending" <?= $order['status'] === 'pending' ? 'selected' : ''; ?>>Pending</option>
+                                                        <option value="processing" <?= $order['status'] === 'processing' ? 'selected' : ''; ?>>Processing</option>
+                                                        <option value="shipped" <?= $order['status'] === 'shipped' ? 'selected' : ''; ?>>Shipped</option>
+                                                        <option value="delivered" <?= $order['status'] === 'delivered' ? 'selected' : ''; ?>>Delivered</option>
+                                                        <option value="completed" <?= $order['status'] === 'completed' ? 'selected' : ''; ?>>Completed</option>
+                                                    </select>
+                                                </form>
+                                            <?php endif; ?>
                                         </div>
                                     </td>
                                 </tr>

@@ -83,7 +83,7 @@ include '../includes/admin_header.php';
                         <i class="fas fa-shopping-cart"></i>
                     </div>
                     <div class="stat-content">
-                        <h3><?= count($orders); ?></h3>
+                        <h3><?= count(array_filter($orders, function($o) { return $o['status'] !== 'cancelled'; })); ?></h3>
                         <p>Total Orders</p>
                     </div>
                 </div>
@@ -119,7 +119,7 @@ include '../includes/admin_header.php';
                         <i class="fas fa-dollar-sign"></i>
                     </div>
                     <div class="stat-content">
-                        <h3>$<?= number_format(array_sum(array_map(function($order) { return $order['total_amount'] ?? 0; }, $orders)), 2); ?></h3>
+                        <h3>$<?= number_format(array_sum(array_map(function($order) { return $order['total_amount'] ?? 0; }, array_filter($orders, function($o) { return $o['status'] !== 'cancelled'; }))), 2); ?></h3>
                         <p>Total Revenue</p>
                     </div>
                 </div>

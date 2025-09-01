@@ -35,14 +35,15 @@ try {
     $products_result = $conn->query($products_sql);
     $stats['products'] = $products_result->fetch_assoc();
 
-    // Get total orders
+    // Get total orders (excluding cancelled for totals)
     $orders_sql = "SELECT 
-                     COUNT(*) as total_orders,
-                     SUM(total_amount) as total_revenue,
+                     COUNT(CASE WHEN status != 'cancelled' THEN 1 END) as total_orders,
+                     SUM(CASE WHEN status != 'cancelled' THEN total_amount ELSE 0 END) as total_revenue,
                      COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders,
                      COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as processing_orders,
                      COUNT(CASE WHEN status = 'shipped' THEN 1 END) as shipped_orders,
                      COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_orders,
+                     COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_orders,
                      COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_orders
                    FROM orders";
     $orders_result = $conn->query($orders_sql);
@@ -71,14 +72,15 @@ try {
         }
     }
 
-    // Get top selling products
+    // Get top selling products (exclude cancelled orders)
     $top_products_sql = "SELECT p.title, p.price, s.shop_name,
                          COUNT(oi.id) as times_ordered,
                          COALESCE(SUM(oi.quantity), 0) as total_quantity
                          FROM products p
                          JOIN sellers s ON p.seller_id = s.id
                          LEFT JOIN order_items oi ON p.id = oi.product_id
-                         WHERE p.status = 'approved'
+                         LEFT JOIN orders o ON oi.order_id = o.id
+                         WHERE p.status = 'approved' AND (o.status IS NULL OR o.status != 'cancelled')
                          GROUP BY p.id
                          ORDER BY total_quantity DESC
                          LIMIT 10";
@@ -200,6 +202,10 @@ include '../includes/admin_header.php';
                     <div class="stat-item">
                         <span class="stat-label">Delivered Orders:</span>
                         <span class="stat-value"><?= number_format($stats['orders']['delivered_orders'] ?? 0); ?></span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Completed Orders:</span>
+                        <span class="stat-value"><?= number_format($stats['orders']['completed_orders'] ?? 0); ?></span>
                     </div>
                     <div class="stat-item">
                         <span class="stat-label">Cancelled Orders:</span>

@@ -24,7 +24,7 @@ if ($category_id > 0) {
 }
 
 if (!empty($search_query)) {
-    $where_conditions[] = "(p.name LIKE ? OR p.description LIKE ?)";
+    $where_conditions[] = "(p.title LIKE ? OR p.description LIKE ?)";
     $search_param = '%' . $search_query . '%';
     $params[] = $search_param;
     $params[] = $search_param;
@@ -37,7 +37,7 @@ $where_clause = implode(' AND ', $where_conditions);
 $order_by = match($sort_by) {
     'price_low' => 'p.price ASC',
     'price_high' => 'p.price DESC',
-    'name' => 'p.name ASC',
+    'name' => 'p.title ASC',
     'oldest' => 'p.created_at ASC',
     default => 'p.created_at DESC'
 };
@@ -63,9 +63,10 @@ try {
 
     // Get products for current page with main image
     $sql = "SELECT p.*, s.shop_name, c.name as category_name,
-                   (SELECT pi.file_path FROM product_images pi 
-                    WHERE pi.product_id = p.id 
-                    ORDER BY pi.id LIMIT 1) as main_image
+                   COALESCE(p.main_image, 
+                           (SELECT pi.file_path FROM product_images pi 
+                            WHERE pi.product_id = p.id 
+                            ORDER BY pi.id LIMIT 1)) as main_image
             FROM products p 
             JOIN sellers s ON p.seller_id = s.id 
             JOIN categories c ON p.category_id = c.id 
@@ -209,7 +210,7 @@ include 'includes/buyer_header.php';
                                 }
                             }
                             ?>
-                            <img src="<?= $image_path ?>" alt="<?= htmlspecialchars($product['name'] ?? '') ?>" loading="lazy" onerror="this.src='assets/images/placeholder-product.svg'">
+                            <img src="<?= $image_path ?>" alt="<?= htmlspecialchars($product['title'] ?? '') ?>" loading="lazy" onerror="this.src='assets/images/placeholder-product.svg'">
                             <div class="product-overlay">
                                 <a href="product.php?id=<?= $product['id'] ?>" class="btn btn-primary btn-sm">
                                     <i class="fas fa-eye"></i> View Details
@@ -222,7 +223,7 @@ include 'includes/buyer_header.php';
                             </div>
                             <h3 class="product-title">
                                 <a href="product.php?id=<?= $product['id'] ?>">
-                                    <?= htmlspecialchars($product['name'] ?? '') ?>
+                                    <?= htmlspecialchars($product['title'] ?? '') ?>
                                 </a>
                             </h3>
                             <p class="product-description">
